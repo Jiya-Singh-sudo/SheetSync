@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+paddleocr
+opencv-python
+python-multipart
