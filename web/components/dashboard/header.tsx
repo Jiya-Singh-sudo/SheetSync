@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
+import { useSession, signOut } from 'next-auth/react';
 import {
   Bell, Moon, Sun, ChevronDown, Check, RefreshCw, FileSpreadsheet, Menu
 } from 'lucide-react';
@@ -20,6 +21,12 @@ interface HeaderProps {
 export function Header({ title, onMenuClick }: HeaderProps) {
   const { theme, setTheme } = useTheme();
   const [syncing, setSyncing] = useState(false);
+  const { data: session } = useSession();
+
+  const userName = session?.user?.name || mockUser.name;
+  const userEmail = session?.user?.email || mockUser.email;
+  const userAvatar = session?.user?.image || mockUser.avatar;
+  const isGoogleConnected = !!(session as any)?.accessToken;
 
   const handleSync = () => {
     setSyncing(true);
@@ -46,10 +53,15 @@ export function Header({ title, onMenuClick }: HeaderProps) {
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
               <span className="text-blue-500">Syncing...</span>
             </>
-          ) : (
+          ) : isGoogleConnected ? (
             <>
               <div className="w-2 h-2 rounded-full bg-green-500" />
               <span>Google Connected</span>
+            </>
+          ) : (
+            <>
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>Demo Mode</span>
             </>
           )}
         </button>
@@ -73,25 +85,28 @@ export function Header({ title, onMenuClick }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-xl hover:bg-muted transition-colors">
               <img
-                src={mockUser.avatar}
-                alt={mockUser.name}
+                src={userAvatar}
+                alt={userName}
                 className="w-7 h-7 rounded-full object-cover ring-2 ring-border"
               />
-              <span className="text-sm font-medium hidden sm:block">{mockUser.name.split(' ')[0]}</span>
+              <span className="text-sm font-medium hidden sm:block">{userName.split(' ')[0]}</span>
               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground hidden sm:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <div className="px-3 py-2">
-              <p className="text-sm font-medium">{mockUser.name}</p>
-              <p className="text-xs text-muted-foreground">{mockUser.email}</p>
+              <p className="text-sm font-medium">{userName}</p>
+              <p className="text-xs text-muted-foreground">{userEmail}</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2">
               <FileSpreadsheet className="w-4 h-4" />
               My Sheets
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive">
+            <DropdownMenuItem 
+              onClick={() => signOut({ callbackUrl: '/' })} 
+              className="gap-2 text-destructive focus:text-destructive cursor-pointer"
+            >
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

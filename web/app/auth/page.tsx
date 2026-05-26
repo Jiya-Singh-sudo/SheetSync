@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import {
   ScanLine, ShieldCheck, FileSpreadsheet, Lock, Check, ArrowLeft,
   ChevronRight, Sparkles, Globe
@@ -37,7 +38,10 @@ export default function AuthPage() {
 
   const handleGoogleSignIn = () => {
     setLoading(true);
-    setTimeout(() => router.push('/dashboard'), 1500);
+    signIn('google', { callbackUrl: '/dashboard' }).catch((err) => {
+      console.error("Google sign in failed:", err);
+      setLoading(false);
+    });
   };
 
   return (
