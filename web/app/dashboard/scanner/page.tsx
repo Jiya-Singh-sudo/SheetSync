@@ -13,6 +13,9 @@ import { OCRPreview } from '@/components/scanner/OCRPreview';
 import { compressAndResize } from '@/lib/image';
 import { ScanState, OCRConfig, ScanResult } from '@/types/scanner';
 
+const SPREADSHEET_KEY = 'sheetscan_spreadsheet_id';
+const SPREADSHEET_NAME_KEY = 'sheetscan_spreadsheet_name';
+
 export default function ScannerPage() {
   const [state, setState] = useState<ScanState>('idle');
   const [activeImageSrc, setActiveImageSrc] = useState<string | null>(null);
@@ -22,10 +25,12 @@ export default function ScannerPage() {
   const [extractedText, setExtractedText] = useState('');
   const [confidence, setConfidence] = useState(0);
 
-  // Sheets Sync State
-  const [selectedSheet, setSelectedSheet] = useState('Business Receipts 2024');
+  // Sheets Sync State — real integration
+  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
+  const [spreadsheetName, setSpreadsheetName] = useState('SheetScan Data');
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // OCR Config Setup
   const [ocrConfig, setOcrConfig] = useState<OCRConfig>({
@@ -52,6 +57,14 @@ export default function ScannerPage() {
     runOCR,
     cancelOCR,
   } = useOCR();
+
+  // Load persisted spreadsheetId from localStorage on mount
+  useEffect(() => {
+    const storedId = localStorage.getItem(SPREADSHEET_KEY);
+    const storedName = localStorage.getItem(SPREADSHEET_NAME_KEY);
+    if (storedId) setSpreadsheetId(storedId);
+    if (storedName) setSpreadsheetName(storedName);
+  }, []);
 
   // Clean up Object URL to prevent browser memory leaks
   const cleanupImage = useCallback(() => {
@@ -136,6 +149,7 @@ export default function ScannerPage() {
       setConfidence(result.confidence);
       setState('result');
       setIsSaved(false); // Reset sheets sync status
+      setSaveError(null);
     } catch (err: any) {
       console.error('OCR analysis failed:', err);
       // If it was cancelled manually, go back to camera view or captured
@@ -165,12 +179,61 @@ export default function ScannerPage() {
     setState('camera');
   };
 
-  const handleSaveToSheets = () => {
+  /**
+   * REAL Google Sheets save flow:
+   * 1. If no spreadsheetId yet → call /api/sheets/create to make one
+   * 2. Call /api/sheets/append with the OCR data + spreadsheetId
+   */
+  const handleSaveToSheets = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    setSaveError(null);
+
+    try {
+      let sheetId = spreadsheetId;
+
+      // Step 1: Create spreadsheet if the user doesn't have one yet
+      if (!sheetId) {
+        const createRes = await fetch('/api/sheets/create', { method: 'POST' });
+        const createData = await createRes.json();
+
+        if (!createRes.ok) {
+          throw new Error(createData.error || 'Failed to create spreadsheet');
+        }
+
+        sheetId = createData.spreadsheetId;
+        setSpreadsheetId(sheetId);
+        setSpreadsheetName('SheetScan Data');
+
+        // Persist so we don't create again on next scan
+        localStorage.setItem(SPREADSHEET_KEY, sheetId!);
+        localStorage.setItem(SPREADSHEET_NAME_KEY, 'SheetScan Data');
+      }
+
+      // Step 2: Append the OCR row to the user's sheet
+      const appendRes = await fetch('/api/sheets/append', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: extractedText,
+          confidence,
+          spreadsheetId: sheetId,
+          source: 'Camera',
+        }),
+      });
+
+      const appendData = await appendRes.json();
+
+      if (!appendRes.ok) {
+        throw new Error(appendData.error || 'Failed to save to Google Sheets');
+      }
+
       setIsSaved(true);
-    }, 1500);
+    } catch (err: any) {
+      console.error('Save to Sheets failed:', err);
+      setSaveError(err.message || 'Failed to save to Google Sheets');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -327,8 +390,8 @@ export default function ScannerPage() {
                   onSaveToSheets={handleSaveToSheets}
                   isSaving={isSaving}
                   isSaved={isSaved}
-                  selectedSheet={selectedSheet}
-                  onChangeSheet={setSelectedSheet}
+                  saveError={saveError}
+                  sheetName={spreadsheetName}
                 />
               </div>
             )}

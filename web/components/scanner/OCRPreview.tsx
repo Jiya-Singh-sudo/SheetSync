@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, RotateCcw, FileSpreadsheet, Download, Zap, Sparkles, ChevronRight } from 'lucide-react';
+import { Copy, Check, RotateCcw, FileSpreadsheet, Download, Zap, Sparkles, ChevronRight, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface OCRPreviewProps {
@@ -11,8 +11,8 @@ interface OCRPreviewProps {
   onSaveToSheets: () => void;
   isSaving: boolean;
   isSaved: boolean;
-  selectedSheet: string;
-  onChangeSheet: (sheet: string) => void;
+  saveError: string | null;
+  sheetName: string;
 }
 
 const getConfidenceMeta = (score: number) => {
@@ -31,8 +31,8 @@ export const OCRPreview: React.FC<OCRPreviewProps> = ({
   onSaveToSheets,
   isSaving,
   isSaved,
-  selectedSheet,
-  onChangeSheet,
+  saveError,
+  sheetName,
 }) => {
   const [copied, setCopied] = useState(false);
   const meta = getConfidenceMeta(confidence);
@@ -118,33 +118,37 @@ export const OCRPreview: React.FC<OCRPreviewProps> = ({
           </div>
         </div>
 
-        {/* Google Sheets Sync Selector & Action */}
+        {/* Google Sheets Sync — REAL integration */}
         <div className="space-y-3">
-          {/* Select sheet Target */}
+          {/* Sheet target indicator */}
           <div className="flex items-center gap-2.5 p-3 rounded-xl bg-muted/40 border border-border/50">
             <FileSpreadsheet className="w-4.5 h-4.5 text-emerald-500 flex-shrink-0" />
-            <select
-              value={selectedSheet}
-              onChange={(e) => onChangeSheet(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none text-foreground font-medium cursor-pointer"
-            >
-              <option value="Business Receipts 2024">Business Receipts 2024</option>
-              <option value="Invoice Tracker">Invoice Tracker</option>
-              <option value="Field Notes Log">Field Notes Log</option>
-            </select>
-            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <span className="flex-1 text-sm font-medium text-foreground truncate">
+              {sheetName}
+            </span>
+            <span className="text-[10px] text-muted-foreground px-2 py-0.5 rounded-full bg-muted border border-border/50">
+              Google Drive
+            </span>
           </div>
+
+          {/* Error display */}
+          {saveError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">{saveError}</span>
+            </div>
+          )}
 
           {/* Sync status button */}
           {isSaved ? (
-            <div className="flex items-center justify-center gap-2 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-medium animate-pulse">
+            <div className="flex items-center justify-center gap-2 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-medium">
               <Check className="w-4 h-4" />
-              Synced successfully to {selectedSheet}
+              Synced to {sheetName} in your Google Drive
             </div>
           ) : (
             <Button
               onClick={onSaveToSheets}
-              disabled={isSaving}
+              disabled={isSaving || !text.trim()}
               className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border-0 shadow-lg shadow-blue-500/20 h-11 text-sm font-medium"
             >
               {isSaving ? (
@@ -153,7 +157,7 @@ export const OCRPreview: React.FC<OCRPreviewProps> = ({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Syncing to Google Sheets...
+                  Saving to Google Sheets...
                 </>
               ) : (
                 <>
